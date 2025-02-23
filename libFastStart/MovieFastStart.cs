@@ -7,6 +7,9 @@ namespace io.github.toyota32k.media;
 public class MovieFastStart {
     #region Results
 
+    /**
+     * Source analysis results
+     */
     public class Status {
         public bool SlowStart { get; set; } = false;
         public bool HasFreeAtoms { get; set; } = false;
@@ -14,10 +17,18 @@ public class MovieFastStart {
         public bool AlreadySuitable => !SlowStart && !HasFreeAtoms;
 
     }
-
     public Status SourceStatus { get; private set; } = new Status();
     public Exception? LastException { get; private set; } = null;
     public long OutputLength { get; private set; } = 0L;
+
+    #endregion
+
+    #region Options
+
+    public INotify? Notify { get; set; } = null;
+    public string TaskName { get; set; } = "";
+    public bool RemoveFreeAtom { get; set; } = true;         // true: Attempt to remove FREE Atom even if MOOV is at the beginning / false: Only check if MOOV is at the beginning
+    public LoggerEx Logger { get; set; } = new LoggerEx("MFS");
 
     #endregion
 
@@ -30,24 +41,18 @@ public class MovieFastStart {
         void UpdateProgress(long current, long total, string? message);
     }
 
-    public INotify? Notify { get; set; } = null;
-    public string TaskName { get; set; } = "";
-    public bool RemoveFreeAtom { get; set; } = true;         // true: MOOVが先頭にあってもFREE Atom があれば除去を試みる / false: MOOVが先頭にあるかどうかだけチェック
-    
-    private static LoggerEx logger = new LoggerEx("MFS");
-
     private string FMT(string message) {
         return TaskName.IsEmpty() ? message : $"[{TaskName}]-{message}";
     }
     private void VERBOSE(string message) {
         message = FMT(message);
         Notify?.Verbose(message);
-        logger.debug(message);
+        Logger.debug(message);
     }
     private void ERROR(string message) {
         message = FMT(message);
         Notify?.Error(message);
-        logger.error(message);
+        Logger.error(message);
     }
     private void ERROR(Exception e) {
         ERROR(e.ToString());
@@ -55,12 +60,12 @@ public class MovieFastStart {
     private void WARNING(string message) {
         message = FMT(message);
         Notify?.Warning(message);
-        logger.warn(message);
+        Logger.warn(message);
     }
     private void MESSAGE(string message) {
         message = FMT(message);
         Notify?.Message(message);
-        logger.info(message);
+        Logger.info(message);
     }
     public bool OutputProgressLog { get; set; } = false;
     private void PROGRESS(long current, long total, string? message) {
@@ -70,10 +75,10 @@ public class MovieFastStart {
         Notify?.UpdateProgress(current, total, message);
         if (OutputProgressLog) {
             if (message != null) {
-                logger.info($"{message}: {current} / {total}");
+                Logger.info($"{message}: {current} / {total}");
             }
             else {
-                logger.info($"{current} / {total}");
+                Logger.info($"{current} / {total}");
             }
         }
     }
@@ -159,6 +164,7 @@ public class MovieFastStart {
     #endregion
 
     #region Atom Processing
+
     private class Atom {
         public string type;
         public ulong size;
@@ -177,18 +183,20 @@ public class MovieFastStart {
         public Atom? mdat { get; set; } = null;
         public Atom? ftyp { get; set; } = null;
 
-        public bool HasFtyp => ftyp != null;               // FTYP Atom がある
-        public bool HasMoov => moov != null;               // MOOV Atom がある
-        public bool HasMdat => mdat != null;               // MDAT Atom がある
-        public bool IsValid => HasFtyp && HasMoov && HasMdat;
-        public bool MoovFirst { get; set; } = false;            // MOOV Atom が先頭にある
-        public bool HasFreeAtoms { get; set; } = false;          // FREE Atom がある
-        public bool HasRedundantTail { get; set; } = false;     // MDATの後ろに無駄なデータがある
-        public bool Truncated { get; set; } = false;            // ファイルが途中で切れている
-        public long FreeSize { get; set; } = 0L;                // MDATの前にあるFREE Atom の合計サイズ（オフセットの計算に使用）
+        public bool HasFtyp => ftyp != null;               // FTYP Atom exists
+        public bool HasMoov => moov != null;               // MOOV Atom exists
+        public bool HasMdat => mdat != null;               // MDAT Atom exists
+        public bool IsValid => HasFtyp && HasMoov && HasMdat;   // File is valid (all required atoms exist)
+        public bool MoovFirst { get; set; } = false;            // MOOV Atom is at the beginning
+        public bool HasFreeAtoms { get; set; } = false;          // FREE Atoms exist
+        public bool HasRedundantTail { get; set; } = false;     // There is redundant data after MDAT
+        public bool Truncated { get; set; } = false;            // This file is truncated
+        public long FreeSize { get; set; } = 0L;                // Total size of FREE Atoms before MDAT (used for offset calculation)
 
-        // MOOV に含まれる stco/co64 には、MDAT のオフセットを補正するための値が格納されている。
-        // MOOVを移動、または、FREE を作成した場合には、この値を補正する必要がある。
+        // The stco/co64 contained in MOOV stores values to correct the offset of MDAT.
+        // When MOOV or FREE is moved, it is necessary to correct this value.
+        // This OffsetBias is the difference between the current offset and the offset after fast start / delete free.
+        // In other words, by adding OffsetBias to the current offset, the corrected offset is obtained.
         public long OffsetBias => (MoovFirst ? 0 : (long)moov!.size) - FreeSize;
     }
 
@@ -326,7 +334,7 @@ public class MovieFastStart {
     }
 
     /**
-     * Fast Start 処理の本体
+     * Core of Fast Start Processing
      * @return true: Converted / false: Not Converted
      */
     private async Task<bool> processImpl(
@@ -337,7 +345,7 @@ public class MovieFastStart {
         MESSAGE($"Analyzing index of top level atoms...");
         var atomList = await analyzeTopLevelAtoms(inputStream);
         if (!atomList.IsValid) {
-            // FTYPE/MOOV/MDATが揃っていない
+            // FTYPE/MOOV/MDAT are not all present
             MESSAGE($"Invalid file.");
             SourceStatus.Unsupported = true;
             return false;
@@ -345,20 +353,20 @@ public class MovieFastStart {
 
         SourceStatus.HasFreeAtoms = atomList.HasFreeAtoms;
         if (atomList.MoovFirst) {
-            // すでにMOOVが先頭にある
+            // MOOV is already at the beginning
             if (!atomList.HasFreeAtoms && !atomList.HasRedundantTail) {
-                // 無駄なAtomがないので変換不要
+                // No redundant atoms, so no conversion needed
                 SourceStatus.HasFreeAtoms = atomList.HasFreeAtoms;
                 MESSAGE($"File already suitable.");
                 return false;
             }
             if (!RemoveFreeAtom) {
-                // FreeAtomを削除しない場合はこれ以上の処理は不要
+                // If not removing FREE atoms, no further processing is needed
                 MESSAGE($"File has redundant atoms but ignored.");
                 return false;
             }
         } else {
-            // MOOVが先頭にない
+            // MOOV is not at the beginning
             SourceStatus.SlowStart = true;
         }
 
@@ -370,7 +378,7 @@ public class MovieFastStart {
         }
 
         MESSAGE($"Patching moov...");
-        var moov = atomList.moov!;  // IsValid でチェック済み
+        var moov = atomList.moov!;  // Already checked by IsValid
         int offset = (int)atomList.OffsetBias;
         // Read MOOV contents to buffer;
         byte[] moovContents = new byte[(int)moov.size];
@@ -380,11 +388,11 @@ public class MovieFastStart {
             await inputStream.ReadAsync(moovContents);
         }
         catch (IOException ex) {
-            logger.error(ex);
+            Logger.error(ex);
             return false;
         }
 
-        // moovContents から stco/co64 を探して offset を補正
+        // collect offset of stco/co64 on moovContents
         using var moovIn = new MemoryStream(moovContents);
         using var moovOut = new MemoryStream(moovContents.Length);
         try {
@@ -419,7 +427,7 @@ public class MovieFastStart {
 
         }
         catch (Exception ex) {
-            logger.error(ex);
+            Logger.error(ex);
             return false;
         }
 
@@ -429,7 +437,7 @@ public class MovieFastStart {
         try {
             using (var outputStream = outputStreamFactory.Create()) {
                 // write ftype
-                var ftyp = atomList.ftyp!;  // IsValid でチェック済み
+                var ftyp = atomList.ftyp!;  // already checked by IsValid
                 VERBOSE($"Writing ftyp at {outputStream.Position} length={ftyp.size}");
 
                 inputStream.Position = (long)ftyp.start;
@@ -462,7 +470,7 @@ public class MovieFastStart {
                         var len = await inputStream.ReadAsync(chunk, 0, (int)Math.Min(remain, CHUNK_SIZE));
                         if (len <= 0) {
                             ERROR($"Found Incomplete Atom: {atom.type} - {remain} bytes short.");
-                            // todo: エラーにするか、成功とするか？
+                            // input file is truncated
                             throw new Exception("Incomplete Atom: " + atom.type);
                         }
                         await outputStream.WriteAsync(chunk, 0, len);

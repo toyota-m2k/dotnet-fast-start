@@ -10,8 +10,10 @@
     <Description>fast start processor for MP4 video files.</Description>
     <Copyright>Copyright (C) 2025 toyota.m2k. All RIghts Reserved.</Copyright>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <AssemblyName>io.github.toyota32k.FastStart</AssemblyName>
-    <Version>1.0.3</Version>
+    <AssemblyName>io.github.toyota32k.MP4FastStart</AssemblyName>
+    <Version>0.1.0</Version>
+    <PackageProjectUrl>https://github.com/toyota-m2k/dotnet-fast-start</PackageProjectUrl>
+    <Title>MP4 Fast Start</Title>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
