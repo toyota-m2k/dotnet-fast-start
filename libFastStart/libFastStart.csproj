@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>io.github.toyota32k.media</RootNamespace>
+    <Authors>io.github.toyota-m2k</Authors>
+    <Company>toyota-m2k</Company>
+    <Description>fast start processor for MP4 video files.</Description>
+    <Copyright>Copyright (C) 2025 toyota.m2k. All RIghts Reserved.</Copyright>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <AssemblyName>io.github.toyota32k.FastStart</AssemblyName>
+    <Version>1.0.3</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="io.github.toyota32k.dotnetLittleToolkit" Version="0.1.0" />
+  </ItemGroup>
+
+</Project>

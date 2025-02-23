@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FastStart": {
+      "commandName": "Project",
+      "commandLineArgs": "e:\\temp\\b.mp4 e:\\temp\\c.mp4"
+    }
+  }
+}
