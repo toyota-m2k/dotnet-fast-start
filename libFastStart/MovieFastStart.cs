@@ -282,7 +282,8 @@ public class MovieFastStart {
                     inputStream.Position += ((long)atom.size - (long)skippedBytes);
                 }
                 catch (Exception e) {
-                    ERROR("Cannot seek to next atom, maybe truncated.");
+                    ERROR(e);
+                    ERROR($"Cannot seek to next atom, [{atom.type}] maybe truncated.");
                     atomList.Truncated = true;
                     break;
                 }
@@ -438,7 +439,7 @@ public class MovieFastStart {
             using (var outputStream = outputStreamFactory.Create()) {
                 // write ftype
                 var ftyp = atomList.ftyp!;  // already checked by IsValid
-                VERBOSE($"Writing ftyp at {outputStream.Position} length={ftyp.size}");
+                VERBOSE($"Writing ftyp: length={ftyp.size}");
 
                 inputStream.Position = (long)ftyp.start;
                 var buffer = new byte[ftyp.size];
@@ -449,7 +450,7 @@ public class MovieFastStart {
                 totalLength += (long)ftyp.size;
 
                 // write patched moov
-                VERBOSE($"Writing moov at {outputStream.Position} length={moovOut.Length}");
+                VERBOSE($"Writing moov: length={moovOut.Length}");
                 moovOut.Position = 0;
                 await moovOut.CopyToAsync(outputStream);
                 totalLength += moovOut.Length;
@@ -461,7 +462,7 @@ public class MovieFastStart {
                         atom.type.Equals("free", StringComparison.OrdinalIgnoreCase)) {
                         continue;
                     }
-                    VERBOSE($"Writing {atom.type} at {outputStream.Position} length={atom.size}");
+                    VERBOSE($"Writing {atom.type}: length={atom.size}");
 
                     inputStream.Position = (long)atom.start;
                     byte[] chunk = new byte[CHUNK_SIZE];

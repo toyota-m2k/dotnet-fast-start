@@ -11,7 +11,7 @@
     <Copyright>Copyright (C) 2025 toyota.m2k. All RIghts Reserved.</Copyright>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <AssemblyName>io.github.toyota32k.MP4FastStart</AssemblyName>
-    <Version>0.1.0</Version>
+    <Version>0.3.0</Version>
     <PackageProjectUrl>https://github.com/toyota-m2k/dotnet-fast-start</PackageProjectUrl>
     <Title>MP4 Fast Start</Title>
   </PropertyGroup>
@@ -23,6 +23,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
     <IsAotCompatible>True</IsAotCompatible>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\LICENSE">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="io.github.toyota32k.dotnetLittleToolkit" Version="0.1.0" />
